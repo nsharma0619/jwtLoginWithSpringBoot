@@ -16,11 +16,12 @@ public class HelloController {
     @PreAuthorize("hasRole('USER')")
     @GetMapping("/user")
     public String userEndpoint(){
-        return "hello user";
+        return "Only user should be able to view it.";
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/admin")
     public String adminEndpoint(){
-        return "hello admin";
+        return "Only admin should be able to view it.";
     }
 }

@@ -1,8 +1,13 @@
 package com.nsharma.springSecurityDemo.security;
 
+import com.nsharma.springSecurityDemo.security.jwt.AuthEntryPointJwt;
+import com.nsharma.springSecurityDemo.security.jwt.AuthTokenFilter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -17,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import javax.sql.DataSource;
 
@@ -30,35 +36,38 @@ public class SecurityConfig {
     @Autowired
     DataSource dataSource;
 
+    @Autowired
+    private AuthEntryPointJwt unauthorizedHandler;
+
+    @Bean
+    public AuthTokenFilter authenticationJwtTokenFilter() {
+        return new AuthTokenFilter();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration builder) throws Exception{
+        return builder.getAuthenticationManager();
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
         http.authorizeHttpRequests((requests) ->
                 requests.requestMatchers("/h2-console/**").permitAll()
+                        .requestMatchers("/login").permitAll()
                             .anyRequest().authenticated());
-        http.formLogin(withDefaults());
-//        http.sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)); // creating request stateless
-        http.httpBasic(withDefaults());
+        http.sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)); // creating request stateless
+        http.exceptionHandling(exception->exception.authenticationEntryPoint(unauthorizedHandler));
         http.headers(headers->
                 headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin));
         http.csrf(AbstractHttpConfigurer::disable);
+        http.addFilterBefore(authenticationJwtTokenFilter(), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
     @Bean
     public UserDetailsService userDetailsService(){
-        UserDetails john = User.builder()
-                            .username("john")
-                            .password(passwordEncoder().encode("password"))
-                            .roles("USER").build();
-        UserDetails admin = User.builder()
-                .username("admin")
-                .password(passwordEncoder().encode("password"))
-                .roles("ADMIN").build();
-        JdbcUserDetailsManager jdbcUserDetailsManager = new JdbcUserDetailsManager(dataSource);
-        jdbcUserDetailsManager.createUser(john);
-        jdbcUserDetailsManager.createUser(admin);
-//        return new InMemoryUserDetailsManager(john, admin);
-        return jdbcUserDetailsManager;
+
+        return new JdbcUserDetailsManager(dataSource);
     }
 
     @Bean
